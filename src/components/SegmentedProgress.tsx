@@ -40,10 +40,11 @@ function describeRoundedWedge(
   if (sweep <= 0.5) return '';
 
   const halfRad = (sweep * Math.PI) / 360;
+  // Keep fillets small so radial sides stay straight.
   const cr = Math.min(
     cornerRadius,
-    radius * 0.38,
-    radius * Math.sin(halfRad) * 0.85,
+    radius * 0.12,
+    radius * Math.sin(halfRad) * 0.35,
   );
 
   if (cr < 1) {
@@ -103,7 +104,8 @@ export function SegmentedProgress({
   const pieOuterR = outerRingR - rimGap;
   const gapDeg = segments > 1 ? Math.min(11, 52 / segments) : 0;
   const slice = 360 / segments;
-  const cornerRadius = Math.max(3.5, size * 0.18);
+  // Tiny corner fillets only — keep radial edges visually straight.
+  const cornerRadius = Math.max(1.15, size * 0.045);
 
   const paths = useMemo(() => {
     if (segments === 1) return [];
