@@ -43,7 +43,14 @@
         }
       ],
       "expo-sqlite",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "color": "#3f6f6b",
+          "defaultChannel": "evening-reminders"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

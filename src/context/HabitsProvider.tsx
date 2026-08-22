@@ -9,6 +9,7 @@ import {
 } from 'react';
 
 import { useAuth } from '@/context/AuthProvider';
+import { supabase } from '@/lib/supabase';
 import { Habit, HabitDraft, HabitLog } from '@/types';
 import {
   deleteHabitLogsFromDate,
@@ -72,6 +73,32 @@ export function HabitsProvider({ children }: { children: ReactNode }) {
         setHabits(state.habits);
         setLogs(state.logs);
       } catch (error) {
+        const code =
+          error && typeof error === 'object' && 'code' in error
+            ? String((error as { code?: string }).code)
+            : '';
+        const message =
+          error && typeof error === 'object' && 'message' in error
+            ? String((error as { message?: string }).message)
+            : '';
+        const jwtSkew =
+          code === 'PGRST303' || /jwt issued at future/i.test(message);
+
+        if (jwtSkew) {
+          try {
+            const { error: refreshError } = await supabase.auth.refreshSession();
+            if (!refreshError) {
+              const state = await fetchUserHabits(user.id);
+              if (cancelled) return;
+              setHabits(state.habits);
+              setLogs(state.logs);
+              return;
+            }
+          } catch (retryError) {
+            console.warn('Failed to refresh session after JWT skew', retryError);
+          }
+        }
+
         console.warn('Failed to load habits from Supabase', error);
         if (!cancelled) {
           setHabits([]);

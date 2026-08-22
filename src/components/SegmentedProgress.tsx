@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Svg, { Circle, G, Path } from 'react-native-svg';
+import Svg, { Circle, G, Line, Path } from 'react-native-svg';
 
 type SegmentedProgressProps = {
   count: number;
@@ -10,8 +10,17 @@ type SegmentedProgressProps = {
   trackColor: string;
   fillColor: string;
   checkColor: string;
-  emptyFillColor?: string;
+  /** Divider + unfilled-slice color (should match so they don’t clash). */
+  gapColor: string;
 };
+
+/** Option D reference canvas (debug preview). */
+const REF = 120;
+const REF_RING_STROKE = 3;
+const REF_RING_R = 56;
+const REF_PIE_R = 44;
+const REF_CORNER = 2.5;
+const REF_DIVIDER = 5;
 
 function toRad(deg: number) {
   return ((deg - 90) * Math.PI) / 180;
@@ -26,9 +35,10 @@ function polar(cx: number, cy: number, radius: number, angleDeg: number) {
 }
 
 /**
- * Solid pie wedge (meets at center, no hole) with rounded tip + outer corners.
+ * Option D wedge: abutting pie slice with sweep-flag 0 outer fillets
+ * (straight radials; subtle inset at the outer corners only).
  */
-function describeRoundedWedge(
+function describeOptionDWedge(
   cx: number,
   cy: number,
   radius: number,
@@ -37,48 +47,45 @@ function describeRoundedWedge(
   cornerRadius: number,
 ): string {
   const sweep = endAngle - startAngle;
-  if (sweep <= 0.5) return '';
+  if (sweep <= 0.01 || sweep >= 359.5) return '';
 
-  const halfRad = (sweep * Math.PI) / 360;
-  // Keep fillets small so radial sides stay straight.
   const cr = Math.min(
     cornerRadius,
-    radius * 0.12,
-    radius * Math.sin(halfRad) * 0.35,
+    radius * 0.08,
+    radius * Math.sin((sweep * Math.PI) / 360) * 0.45,
   );
 
-  if (cr < 1) {
-    const a = polar(cx, cy, radius, startAngle);
-    const b = polar(cx, cy, radius, endAngle);
+  if (cr < 0.35) {
+    const start = polar(cx, cy, radius, startAngle);
+    const end = polar(cx, cy, radius, endAngle);
     const large = sweep > 180 ? 1 : 0;
-    return `M ${cx} ${cy} L ${a.x} ${a.y} A ${radius} ${radius} 0 ${large} 1 ${b.x} ${b.y} Z`;
+    return `M ${cx} ${cy} L ${start.x} ${start.y} A ${radius} ${radius} 0 ${large} 1 ${end.x} ${end.y} Z`;
   }
 
-  const tipAlong = cr / Math.tan(halfRad);
-  const tipStart = polar(cx, cy, tipAlong, startAngle);
-  const tipEnd = polar(cx, cy, tipAlong, endAngle);
+  const d = radius - cr;
+  const beta = (Math.asin(Math.min(0.99, cr / d)) * 180) / Math.PI;
 
-  // Outer corner angle inset along the rim.
-  const outerOff = Math.min((cr / radius) * (180 / Math.PI), sweep / 4 - 0.2);
-  const rimStart = polar(cx, cy, radius, startAngle + outerOff);
-  const rimEnd = polar(cx, cy, radius, endAngle - outerOff);
-  const sideStart = polar(cx, cy, radius - cr, startAngle);
-  const sideEnd = polar(cx, cy, radius - cr, endAngle);
+  if (beta * 2 >= sweep - 0.5) {
+    const start = polar(cx, cy, radius, startAngle);
+    const end = polar(cx, cy, radius, endAngle);
+    const large = sweep > 180 ? 1 : 0;
+    return `M ${cx} ${cy} L ${start.x} ${start.y} A ${radius} ${radius} 0 ${large} 1 ${end.x} ${end.y} Z`;
+  }
 
-  const largeOuter = sweep - 2 * outerOff > 180 ? 1 : 0;
+  const reach = d * Math.cos((beta * Math.PI) / 180);
+  const startRadial = polar(cx, cy, reach, startAngle);
+  const endRadial = polar(cx, cy, reach, endAngle);
+  const startArc = polar(cx, cy, radius, startAngle + beta);
+  const endArc = polar(cx, cy, radius, endAngle - beta);
+  const arcSweep = endAngle - startAngle - 2 * beta;
+  const large = arcSweep > 180 ? 1 : 0;
 
   return [
-    `M ${tipStart.x} ${tipStart.y}`,
-    `L ${sideStart.x} ${sideStart.y}`,
-    // Rounded outer corner (start)
-    `A ${cr} ${cr} 0 0 1 ${rimStart.x} ${rimStart.y}`,
-    // Outer rim
-    `A ${radius} ${radius} 0 ${largeOuter} 1 ${rimEnd.x} ${rimEnd.y}`,
-    // Rounded outer corner (end)
-    `A ${cr} ${cr} 0 0 1 ${sideEnd.x} ${sideEnd.y}`,
-    `L ${tipEnd.x} ${tipEnd.y}`,
-    // Rounded tip (bulges toward circle center)
-    `A ${cr} ${cr} 0 0 1 ${tipStart.x} ${tipStart.y}`,
+    `M ${cx} ${cy}`,
+    `L ${startRadial.x} ${startRadial.y}`,
+    `A ${cr} ${cr} 0 0 0 ${startArc.x} ${startArc.y}`,
+    `A ${radius} ${radius} 0 ${large} 1 ${endArc.x} ${endArc.y}`,
+    `A ${cr} ${cr} 0 0 0 ${endRadial.x} ${endRadial.y}`,
     'Z',
   ].join(' ');
 }
@@ -86,73 +93,83 @@ function describeRoundedWedge(
 export function SegmentedProgress({
   count,
   total,
-  size = 28,
+  size = 36,
   trackColor,
   fillColor,
   checkColor,
-  emptyFillColor = 'transparent',
+  gapColor,
 }: SegmentedProgressProps) {
   const segments = Math.max(1, total);
   const filled = Math.max(0, Math.min(count, segments));
-  const complete = filled >= segments;
+  const complete = filled >= segments && segments > 0;
+
+  const scale = size / REF;
   const cx = size / 2;
   const cy = size / 2;
-
-  const ringStroke = 1.5;
-  const outerRingR = size / 2 - ringStroke;
-  const rimGap = Math.max(2.25, size * 0.09);
-  const pieOuterR = outerRingR - rimGap;
-  const gapDeg = segments > 1 ? Math.min(11, 52 / segments) : 0;
+  const ringStroke = REF_RING_STROKE * scale;
+  const ringR = REF_RING_R * scale;
+  const pieR = REF_PIE_R * scale;
+  const cornerRadius = REF_CORNER * scale;
+  const dividerWidth = REF_DIVIDER * scale;
+  const ringColor = filled > 0 ? fillColor : trackColor;
   const slice = 360 / segments;
-  // Tiny corner fillets only — keep radial edges visually straight.
-  const cornerRadius = Math.max(1.15, size * 0.045);
 
-  const paths = useMemo(() => {
-    if (segments === 1) return [];
+  const slices = useMemo(() => {
+    if (complete || segments <= 1) return [];
     return Array.from({ length: segments }, (_, index) => {
-      const start = index * slice + gapDeg / 2;
-      const end = (index + 1) * slice - gapDeg / 2;
+      const start = index * slice;
+      const end = (index + 1) * slice;
       return {
         key: index,
-        d: describeRoundedWedge(cx, cy, pieOuterR, start, end, cornerRadius),
         filled: index < filled,
+        d: describeOptionDWedge(cx, cy, pieR, start, end, cornerRadius),
       };
     });
-  }, [segments, slice, gapDeg, cx, cy, pieOuterR, cornerRadius, filled]);
+  }, [complete, segments, slice, cx, cy, pieR, cornerRadius, filled]);
 
-  const ringColor = complete || filled > 0 ? fillColor : trackColor;
+  const dividers = useMemo(() => {
+    if (complete || segments <= 1) return [];
+    return Array.from({ length: segments }, (_, index) => {
+      const edge = polar(cx, cy, pieR, index * slice);
+      return { key: index, x2: edge.x, y2: edge.y };
+    });
+  }, [complete, segments, slice, cx, cy, pieR]);
 
   return (
     <View style={[styles.wrap, { width: size, height: size }]}>
       <Svg width={size} height={size}>
-        <Circle
-          cx={cx}
-          cy={cy}
-          r={outerRingR}
-          stroke={ringColor}
-          strokeWidth={ringStroke}
-          fill="transparent"
-        />
+        <Circle cx={cx} cy={cy} r={ringR} stroke={ringColor} strokeWidth={ringStroke} fill="none" />
 
-        {segments === 1 ? (
-          filled > 0 ? (
-            <Circle cx={cx} cy={cy} r={pieOuterR} fill={fillColor} />
-          ) : null
+        {complete || (segments === 1 && filled > 0) ? (
+          <Circle cx={cx} cy={cy} r={pieR} fill={fillColor} />
         ) : (
           <G>
-            {paths.map((item) => (
-              <Path
+            {/* Soft track disc — same color as dividers so they blend into empty slices */}
+            {filled > 0 ? <Circle cx={cx} cy={cy} r={pieR} fill={gapColor} /> : null}
+            {slices.map((item) =>
+              item.filled && item.d ? (
+                <Path key={item.key} d={item.d} fill={fillColor} />
+              ) : null,
+            )}
+            {dividers.map((item) => (
+              <Line
                 key={item.key}
-                d={item.d}
-                fill={item.filled ? fillColor : emptyFillColor}
+                x1={cx}
+                y1={cy}
+                x2={item.x2}
+                y2={item.y2}
+                stroke={gapColor}
+                strokeWidth={dividerWidth}
+                strokeLinecap="butt"
               />
             ))}
           </G>
         )}
       </Svg>
+
       {complete ? (
         <View style={styles.checkOverlay} pointerEvents="none">
-          <Ionicons name="checkmark" size={Math.round(size * 0.48)} color={checkColor} />
+          <Ionicons name="checkmark" size={Math.round(size * 0.42)} color={checkColor} />
         </View>
       ) : null}
     </View>

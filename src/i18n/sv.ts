@@ -105,6 +105,20 @@ export const sv: Translations = {
   'settings.appearanceHint': 'Välj ljust eller mörkt läge för appen.',
   'settings.dark': 'Mörkt',
   'settings.light': 'Ljust',
+  'settings.reminders': 'Påminnelser',
+  'settings.remindersHint':
+    'Få en notis kl. 18:00 med vanor som fortfarande är kvar idag.',
+  'settings.eveningReminder': 'Kvällspåminnelse (18:00)',
+  'settings.remindersWeb': 'Påminnelser finns i iOS- och Android-apparna.',
+  'settings.permissionDeniedTitle': 'Notiser blockerade',
+  'settings.permissionDeniedBody':
+    'Aktivera notiser för GridHabits i enhetens inställningar för att få kvällspåminnelser.',
+
+  // Notifications
+  'notifications.eveningTitle': 'Vanor kvar',
+  'notifications.eveningBodyOne': 'Klara av ”{name}” innan dagen är slut.',
+  'notifications.eveningBodyList': 'Kvar: {names}',
+  'notifications.eveningBodyMany': '{count} kvar, bland annat {names}',
 
   // Auth
   'auth.signInSubtitle': 'Logga in för att synka dina vanor',

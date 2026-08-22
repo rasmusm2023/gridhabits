@@ -102,6 +102,20 @@ export const en = {
   'settings.appearanceHint': 'Choose light or dark mode for the app.',
   'settings.dark': 'Dark',
   'settings.light': 'Light',
+  'settings.reminders': 'Reminders',
+  'settings.remindersHint':
+    'Get a notification at 18:00 with any habits still left for today.',
+  'settings.eveningReminder': 'Evening reminder (18:00)',
+  'settings.remindersWeb': 'Reminders are available in the iOS and Android apps.',
+  'settings.permissionDeniedTitle': 'Notifications blocked',
+  'settings.permissionDeniedBody':
+    'Enable notifications for GridHabits in your device settings to get evening reminders.',
+
+  // Notifications
+  'notifications.eveningTitle': 'Habits still left',
+  'notifications.eveningBodyOne': 'Finish “{name}” before the day is over.',
+  'notifications.eveningBodyList': 'Still left: {names}',
+  'notifications.eveningBodyMany': '{count} left, including {names}',
 
   // Auth
   'auth.signInSubtitle': 'Sign in to sync your habits',

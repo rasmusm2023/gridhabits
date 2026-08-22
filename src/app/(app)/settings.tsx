@@ -1,11 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useMemo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Radii, Spacing, type ColorScheme, type ThemeColors } from '@/constants/theme';
 import { useLocale } from '@/context/LocaleProvider';
+import { useNotificationPreferences } from '@/context/NotificationPreferencesProvider';
 import { useTheme } from '@/context/ThemeProvider';
 import type { AppLocale } from '@/i18n';
 
@@ -27,7 +28,20 @@ const APPEARANCE_OPTIONS: {
 export default function SettingsScreen() {
   const { locale, setLocale, t } = useLocale();
   const { colorScheme, setColorScheme, colors } = useTheme();
+  const {
+    supported: notificationsSupported,
+    eveningReminderEnabled,
+    setEveningReminderEnabled,
+  } = useNotificationPreferences();
   const styles = useMemo(() => createStyles(colors), [colors]);
+
+  async function handleEveningReminderToggle() {
+    const next = !eveningReminderEnabled;
+    const result = await setEveningReminderEnabled(next);
+    if (result.error === 'permission') {
+      Alert.alert(t('settings.permissionDeniedTitle'), t('settings.permissionDeniedBody'));
+    }
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
@@ -71,6 +85,51 @@ export default function SettingsScreen() {
               </Pressable>
             );
           })}
+        </View>
+
+        <Text style={[styles.sectionTitle, styles.sectionSpaced]}>{t('settings.reminders')}</Text>
+        <Text style={styles.sectionHint}>
+          {notificationsSupported ? t('settings.remindersHint') : t('settings.remindersWeb')}
+        </Text>
+
+        <View style={styles.options}>
+          <Pressable
+            disabled={!notificationsSupported}
+            onPress={() => {
+              void handleEveningReminderToggle();
+            }}
+            style={[
+              styles.option,
+              eveningReminderEnabled && notificationsSupported && styles.optionSelected,
+              !notificationsSupported && styles.optionDisabled,
+            ]}>
+            <View style={styles.optionLeft}>
+              <Ionicons
+                name="notifications"
+                size={18}
+                color={
+                  eveningReminderEnabled && notificationsSupported
+                    ? colors.accent
+                    : colors.textMuted
+                }
+              />
+              <Text
+                style={[
+                  styles.optionText,
+                  eveningReminderEnabled &&
+                    notificationsSupported &&
+                    styles.optionTextSelected,
+                  !notificationsSupported && styles.optionTextDisabled,
+                ]}>
+                {t('settings.eveningReminder')}
+              </Text>
+            </View>
+            {eveningReminderEnabled && notificationsSupported ? (
+              <Ionicons name="checkmark-circle" size={22} color={colors.accent} />
+            ) : (
+              <View style={styles.radio} />
+            )}
+          </Pressable>
         </View>
 
         <Text style={[styles.sectionTitle, styles.sectionSpaced]}>{t('settings.language')}</Text>
@@ -171,18 +230,27 @@ function createStyles(colors: ThemeColors) {
     optionSelected: {
       borderColor: colors.accent,
     },
+    optionDisabled: {
+      opacity: 0.55,
+    },
     optionLeft: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: Spacing.sm,
+      flexShrink: 1,
+      paddingRight: Spacing.sm,
     },
     optionText: {
       color: colors.text,
       fontSize: 16,
       fontWeight: '600',
+      flexShrink: 1,
     },
     optionTextSelected: {
       color: colors.accent,
+    },
+    optionTextDisabled: {
+      color: colors.textMuted,
     },
     radio: {
       width: 22,

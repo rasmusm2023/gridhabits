@@ -48,11 +48,14 @@ export function HabitRow({ habit, count, disabled = false, onToggle, onEdit }: H
     });
   }, [progress, complete, progressSv, checkScale]);
 
-  // Complete ≈ former mid opacity; partials sit lower so states stay distinct.
+  // Partials stay very light; only full complete jumps to the stronger tint.
   const fillStyle = useAnimatedStyle(() => {
     const value = progressSv.value;
     return {
-      opacity: value <= 0 ? 0 : interpolate(value, [0, 1], [0.1, 0.42]),
+      opacity:
+        value <= 0
+          ? 0
+          : interpolate(value, [0, 0.99, 1], [0.04, 0.11, 0.42]),
     };
   });
 
@@ -62,7 +65,7 @@ export function HabitRow({ habit, count, disabled = false, onToggle, onEdit }: H
       borderColor:
         value <= 0
           ? colors.border
-          : `rgba(${colors.successRgb}, ${interpolate(value, [0, 1], [0.28, 0.55]).toFixed(3)})`,
+          : `rgba(${colors.successRgb}, ${interpolate(value, [0, 0.99, 1], [0.16, 0.24, 0.55]).toFixed(3)})`,
     };
   });
 
@@ -117,11 +120,11 @@ export function HabitRow({ habit, count, disabled = false, onToggle, onEdit }: H
             <SegmentedProgress
               count={count}
               total={target}
-              size={30}
+              size={36}
               trackColor={count > 0 ? colors.success : colors.border}
               fillColor={colors.success}
               checkColor={colors.onSuccess}
-              emptyFillColor={`rgba(${colors.successRgb}, 0.12)`}
+              gapColor={`rgba(${colors.successRgb}, ${count > 0 ? 0.18 : 0.12})`}
             />
           </Animated.View>
         </View>

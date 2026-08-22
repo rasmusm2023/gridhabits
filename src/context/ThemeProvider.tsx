@@ -44,11 +44,13 @@ function readSchemeFromUser(
   return isColorScheme(raw) ? raw : null;
 }
 
-function applyWebThemeColor(background: string) {
+function applyWebThemeColor(background: string, isDark: boolean) {
   if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+  const root = document.documentElement;
+  root.classList.toggle('dark', isDark);
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', background);
-  document.documentElement.style.backgroundColor = background;
+  root.style.backgroundColor = background;
   document.body.style.backgroundColor = background;
 }
 
@@ -91,7 +93,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const isDark = colorScheme === 'dark';
 
   useEffect(() => {
-    applyWebThemeColor(colors.background);
+    applyWebThemeColor(colors.background, isDark);
     if (Platform.OS === 'android') {
       RNStatusBar.setBackgroundColor(colors.background);
       RNStatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content');
