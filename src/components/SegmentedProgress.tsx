@@ -13,34 +13,71 @@ type SegmentedProgressProps = {
   emptyFillColor?: string;
 };
 
-function polarToCartesian(cx: number, cy: number, radius: number, angleDeg: number) {
-  const angleRad = ((angleDeg - 90) * Math.PI) / 180;
+function toRad(deg: number) {
+  return ((deg - 90) * Math.PI) / 180;
+}
+
+function polar(cx: number, cy: number, radius: number, angleDeg: number) {
+  const a = toRad(angleDeg);
   return {
-    x: cx + radius * Math.cos(angleRad),
-    y: cy + radius * Math.sin(angleRad),
+    x: cx + radius * Math.cos(a),
+    y: cy + radius * Math.sin(a),
   };
 }
 
-/** Wedge between innerRadius and outerRadius (ring segment). */
-function describeRingSlice(
+/**
+ * Solid pie wedge (meets at center, no hole) with rounded tip + outer corners.
+ */
+function describeRoundedWedge(
   cx: number,
   cy: number,
-  innerRadius: number,
-  outerRadius: number,
+  radius: number,
   startAngle: number,
   endAngle: number,
+  cornerRadius: number,
 ): string {
-  const outerStart = polarToCartesian(cx, cy, outerRadius, startAngle);
-  const outerEnd = polarToCartesian(cx, cy, outerRadius, endAngle);
-  const innerEnd = polarToCartesian(cx, cy, innerRadius, endAngle);
-  const innerStart = polarToCartesian(cx, cy, innerRadius, startAngle);
-  const largeArc = endAngle - startAngle > 180 ? 1 : 0;
+  const sweep = endAngle - startAngle;
+  if (sweep <= 0.5) return '';
+
+  const halfRad = (sweep * Math.PI) / 360;
+  const cr = Math.min(
+    cornerRadius,
+    radius * 0.38,
+    radius * Math.sin(halfRad) * 0.85,
+  );
+
+  if (cr < 1) {
+    const a = polar(cx, cy, radius, startAngle);
+    const b = polar(cx, cy, radius, endAngle);
+    const large = sweep > 180 ? 1 : 0;
+    return `M ${cx} ${cy} L ${a.x} ${a.y} A ${radius} ${radius} 0 ${large} 1 ${b.x} ${b.y} Z`;
+  }
+
+  const tipAlong = cr / Math.tan(halfRad);
+  const tipStart = polar(cx, cy, tipAlong, startAngle);
+  const tipEnd = polar(cx, cy, tipAlong, endAngle);
+
+  // Outer corner angle inset along the rim.
+  const outerOff = Math.min((cr / radius) * (180 / Math.PI), sweep / 4 - 0.2);
+  const rimStart = polar(cx, cy, radius, startAngle + outerOff);
+  const rimEnd = polar(cx, cy, radius, endAngle - outerOff);
+  const sideStart = polar(cx, cy, radius - cr, startAngle);
+  const sideEnd = polar(cx, cy, radius - cr, endAngle);
+
+  const largeOuter = sweep - 2 * outerOff > 180 ? 1 : 0;
 
   return [
-    `M ${outerStart.x} ${outerStart.y}`,
-    `A ${outerRadius} ${outerRadius} 0 ${largeArc} 1 ${outerEnd.x} ${outerEnd.y}`,
-    `L ${innerEnd.x} ${innerEnd.y}`,
-    `A ${innerRadius} ${innerRadius} 0 ${largeArc} 0 ${innerStart.x} ${innerStart.y}`,
+    `M ${tipStart.x} ${tipStart.y}`,
+    `L ${sideStart.x} ${sideStart.y}`,
+    // Rounded outer corner (start)
+    `A ${cr} ${cr} 0 0 1 ${rimStart.x} ${rimStart.y}`,
+    // Outer rim
+    `A ${radius} ${radius} 0 ${largeOuter} 1 ${rimEnd.x} ${rimEnd.y}`,
+    // Rounded outer corner (end)
+    `A ${cr} ${cr} 0 0 1 ${sideEnd.x} ${sideEnd.y}`,
+    `L ${tipEnd.x} ${tipEnd.y}`,
+    // Rounded tip (bulges toward circle center)
+    `A ${cr} ${cr} 0 0 1 ${tipStart.x} ${tipStart.y}`,
     'Z',
   ].join(' ');
 }
@@ -62,13 +99,11 @@ export function SegmentedProgress({
 
   const ringStroke = 1.5;
   const outerRingR = size / 2 - ringStroke;
-  // Gap between outer circle and pie wedges.
-  const rimGap = Math.max(2.5, size * 0.1);
+  const rimGap = Math.max(2.25, size * 0.09);
   const pieOuterR = outerRingR - rimGap;
-  // Soft center hole so wedges don’t crowd the checkmark.
-  const pieInnerR = Math.max(2.5, size * 0.18);
-  const gapDeg = segments > 1 ? Math.min(8, 40 / segments) : 0;
+  const gapDeg = segments > 1 ? Math.min(11, 52 / segments) : 0;
   const slice = 360 / segments;
+  const cornerRadius = Math.max(3.5, size * 0.18);
 
   const paths = useMemo(() => {
     if (segments === 1) return [];
@@ -77,11 +112,11 @@ export function SegmentedProgress({
       const end = (index + 1) * slice - gapDeg / 2;
       return {
         key: index,
-        d: describeRingSlice(cx, cy, pieInnerR, pieOuterR, start, end),
+        d: describeRoundedWedge(cx, cy, pieOuterR, start, end, cornerRadius),
         filled: index < filled,
       };
     });
-  }, [segments, slice, gapDeg, cx, cy, pieInnerR, pieOuterR, filled]);
+  }, [segments, slice, gapDeg, cx, cy, pieOuterR, cornerRadius, filled]);
 
   const ringColor = complete || filled > 0 ? fillColor : trackColor;
 
