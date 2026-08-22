@@ -1,0 +1,6 @@
+[build]
+  command = "npm run build:web"
+  publish = "dist"
+
+# EXPO_PUBLIC_* vars must be set in Netlify UI (Site settings → Environment variables).
+# They are inlined at build time — redeploy after adding/changing them.
