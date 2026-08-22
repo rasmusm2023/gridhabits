@@ -1,26 +1,28 @@
-import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
+import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
-import { Colors } from '@/constants/theme';
+import { AuthProvider } from '@/context/AuthProvider';
 import { HabitsProvider } from '@/context/HabitsProvider';
+import { LocaleProvider } from '@/context/LocaleProvider';
+import { ThemeProvider, useTheme } from '@/context/ThemeProvider';
 
 import '@/global.css';
 
 SplashScreen.preventAutoHideAsync();
 
-const navigationTheme = {
-  ...DarkTheme,
-  colors: {
-    ...DarkTheme.colors,
-    background: Colors.background,
-    card: Colors.surface,
-    primary: Colors.accent,
-    text: Colors.text,
-    border: Colors.border,
-  },
-};
+function RootNavigator() {
+  const { colors } = useTheme();
+
+  return (
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: colors.background },
+      }}
+    />
+  );
+}
 
 export default function RootLayout() {
   useEffect(() => {
@@ -28,16 +30,14 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <HabitsProvider>
-      <ThemeProvider value={navigationTheme}>
-        <StatusBar style="light" />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: Colors.background },
-          }}
-        />
-      </ThemeProvider>
-    </HabitsProvider>
+    <AuthProvider>
+      <LocaleProvider>
+        <ThemeProvider>
+          <HabitsProvider>
+            <RootNavigator />
+          </HabitsProvider>
+        </ThemeProvider>
+      </LocaleProvider>
+    </AuthProvider>
   );
 }

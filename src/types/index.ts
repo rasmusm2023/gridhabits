@@ -1,3 +1,5 @@
+export type HabitOccurrence = 'daily' | 'weekly' | 'monthly';
+
 export interface Habit {
   id: string;
   name: string;
@@ -7,6 +9,16 @@ export interface Habit {
   icon: string;
   createdAt: string;
   isActive: boolean;
+  /** How often the habit is expected. Defaults to daily for legacy data. */
+  occurrence: HabitOccurrence;
+  /** JS getDay() values (0=Sun … 6=Sat). Used when occurrence is weekly. */
+  weekdays: number[];
+  /** Calendar dates 1–31. Used when occurrence is monthly. */
+  monthDays: number[];
+  /** First date the habit no longer appears (this day and after are excluded). */
+  endedAt: string | null;
+  /** Specific YYYY-MM-DD dates skipped once (habit continues otherwise). */
+  skippedDates: string[];
 }
 
 export interface HabitLog {
@@ -21,17 +33,22 @@ export const HABIT_CATEGORIES = ['Health', 'Hygiene', 'Fitness', 'Mind', 'Other'
 export type HabitCategory = (typeof HABIT_CATEGORIES)[number];
 
 export const HABIT_ICONS = [
-  'medkit-outline',
-  'leaf-outline',
-  'sparkles-outline',
-  'water-outline',
-  'barbell-outline',
-  'book-outline',
-  'moon-outline',
-  'heart-outline',
-  'walk-outline',
-  'cafe-outline',
+  'medkit',
+  'leaf',
+  'sparkles',
+  'water',
+  'barbell',
+  'book',
+  'moon',
+  'heart',
+  'walk',
+  'cafe',
 ] as const;
+
+/** Prefer filled Ionicons glyphs; keeps older `-outline` habit data working. */
+export function toFilledIconName(icon: string): string {
+  return icon.replace(/-outline$/u, '').replace(/-sharp$/u, '');
+}
 
 export const HABIT_COLORS = [
   '#22c55e',

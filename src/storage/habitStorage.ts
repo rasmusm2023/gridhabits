@@ -2,9 +2,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { Habit, HabitLog } from '@/types';
 import { createId } from '@/utils/ids';
+import { defaultOccurrenceFields, normalizeHabitOccurrence } from '@/utils/occurrence';
 
 const STORAGE_KEY = '@gridhabits/state';
-const STORAGE_VERSION = 1;
+const STORAGE_VERSION = 2;
 
 export type PersistedState = {
   version: number;
@@ -14,6 +15,7 @@ export type PersistedState = {
 
 export function createDefaultHabits(): Habit[] {
   const createdAt = new Date().toISOString();
+  const occurrence = defaultOccurrenceFields('daily');
 
   return [
     {
@@ -22,9 +24,10 @@ export function createDefaultHabits(): Habit[] {
       category: 'Health',
       targetDailyCount: 1,
       color: '#a78bfa',
-      icon: 'medkit-outline',
+      icon: 'medkit',
       createdAt,
       isActive: true,
+      ...occurrence,
     },
     {
       id: createId(),
@@ -32,9 +35,10 @@ export function createDefaultHabits(): Habit[] {
       category: 'Health',
       targetDailyCount: 1,
       color: '#34d399',
-      icon: 'leaf-outline',
+      icon: 'leaf',
       createdAt,
       isActive: true,
+      ...occurrence,
     },
     {
       id: createId(),
@@ -42,11 +46,38 @@ export function createDefaultHabits(): Habit[] {
       category: 'Hygiene',
       targetDailyCount: 2,
       color: '#22d3ee',
-      icon: 'sparkles-outline',
+      icon: 'sparkles',
       createdAt,
       isActive: true,
+      ...occurrence,
     },
   ];
+}
+
+function normalizeHabits(habits: unknown): Habit[] {
+  if (!Array.isArray(habits)) {
+    return createDefaultHabits();
+  }
+
+  return habits.map((item) => {
+    const raw = item as Partial<Habit>;
+    return normalizeHabitOccurrence({
+      id: typeof raw.id === 'string' ? raw.id : createId(),
+      name: typeof raw.name === 'string' ? raw.name : 'Habit',
+      category: typeof raw.category === 'string' ? raw.category : 'Other',
+      targetDailyCount:
+        typeof raw.targetDailyCount === 'number' ? Math.max(1, raw.targetDailyCount) : 1,
+      color: typeof raw.color === 'string' ? raw.color : '#4ade80',
+      icon: typeof raw.icon === 'string' ? raw.icon.replace(/-outline$/u, '') : 'leaf',
+      createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : new Date().toISOString(),
+      isActive: true,
+      occurrence: raw.occurrence,
+      weekdays: raw.weekdays,
+      monthDays: raw.monthDays,
+      endedAt: raw.endedAt ?? null,
+      skippedDates: raw.skippedDates ?? [],
+    });
+  });
 }
 
 export async function loadState(): Promise<PersistedState> {
@@ -64,7 +95,7 @@ export async function loadState(): Promise<PersistedState> {
     const parsed = JSON.parse(raw) as Partial<PersistedState>;
     return {
       version: STORAGE_VERSION,
-      habits: Array.isArray(parsed.habits) ? parsed.habits : createDefaultHabits(),
+      habits: normalizeHabits(parsed.habits),
       logs: Array.isArray(parsed.logs) ? parsed.logs : [],
     };
   } catch {

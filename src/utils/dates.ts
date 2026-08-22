@@ -20,6 +20,14 @@ export function addDays(date: Date, amount: number): Date {
   return next;
 }
 
+/** Monday-start week: returns the Monday on or before `date`. */
+export function startOfWeekMonday(date: Date): Date {
+  const day = startOfDay(date);
+  const weekday = day.getDay(); // 0=Sun … 6=Sat
+  const offset = weekday === 0 ? -6 : 1 - weekday;
+  return addDays(day, offset);
+}
+
 export function todayKey(): string {
   return toDateKey(new Date());
 }
@@ -32,22 +40,22 @@ export function isToday(date: Date, now = new Date()): boolean {
   return toDateKey(date) === toDateKey(now);
 }
 
-export function formatLongDate(date: Date): string {
-  return date.toLocaleDateString(undefined, {
+export function formatLongDate(date: Date, localeTag?: string): string {
+  return date.toLocaleDateString(localeTag, {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
   });
 }
 
-export function formatShortDate(date: Date): string {
-  return date.toLocaleDateString(undefined, {
+export function formatShortDate(date: Date, localeTag?: string): string {
+  return date.toLocaleDateString(localeTag, {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
   });
 }
 
-export function monthLabel(date: Date): string {
-  return date.toLocaleDateString(undefined, { month: 'short' });
+export function monthLabel(date: Date, localeTag?: string): string {
+  return date.toLocaleDateString(localeTag, { month: 'short' });
 }

@@ -21,9 +21,16 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "output": "static",
+      "output": "single",
       "bundler": "metro",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon.png",
+      "name": "GridHabits",
+      "shortName": "GridHabits",
+      "description": "Track habits on a GitHub-style grid.",
+      "themeColor": "#0d1117",
+      "backgroundColor": "#0d1117",
+      "display": "standalone",
+      "lang": "en"
     },
     "plugins": [
       "expo-router",
@@ -34,7 +41,9 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
-      ]
+      ],
+      "expo-sqlite",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,
