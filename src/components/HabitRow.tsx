@@ -11,6 +11,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { SegmentedProgress } from '@/components/SegmentedProgress';
 import { Radii, Spacing, type ThemeColors } from '@/constants/theme';
 import { useLocale } from '@/context/LocaleProvider';
 import { useTheme } from '@/context/ThemeProvider';
@@ -34,6 +35,7 @@ export function HabitRow({ habit, count, disabled = false, onToggle, onEdit }: H
   const complete = progress >= 1;
   const progressSv = useSharedValue(progress);
   const checkScale = useSharedValue(complete ? 1 : 0.85);
+  const target = Math.max(1, habit.targetDailyCount);
 
   useEffect(() => {
     progressSv.value = withTiming(progress, {
@@ -46,20 +48,21 @@ export function HabitRow({ habit, count, disabled = false, onToggle, onEdit }: H
     });
   }, [progress, complete, progressSv, checkScale]);
 
+  // Complete ≈ former mid opacity; partials sit lower so states stay distinct.
   const fillStyle = useAnimatedStyle(() => {
-    const t = progressSv.value;
+    const value = progressSv.value;
     return {
-      opacity: t <= 0 ? 0 : interpolate(t, [0, 1], [0.22, 0.8]),
+      opacity: value <= 0 ? 0 : interpolate(value, [0, 1], [0.1, 0.42]),
     };
   });
 
   const borderStyle = useAnimatedStyle(() => {
-    const t = progressSv.value;
+    const value = progressSv.value;
     return {
       borderColor:
-        t <= 0
+        value <= 0
           ? colors.border
-          : `rgba(74, 222, 128, ${interpolate(t, [0, 1], [0.4, 0.9]).toFixed(3)})`,
+          : `rgba(${colors.successRgb}, ${interpolate(value, [0, 1], [0.28, 0.55]).toFixed(3)})`,
     };
   });
 
@@ -79,13 +82,16 @@ export function HabitRow({ habit, count, disabled = false, onToggle, onEdit }: H
     onToggle();
   }
 
+  const nameColor = progress > 0 ? colors.textOnSuccess : colors.text;
+  const metaColor = progress > 0 ? colors.metaOnSuccess : colors.textSecondary;
+
   return (
     <Pressable
       onPress={handlePress}
       onLongPress={onEdit}
       disabled={disabled}
       accessibilityRole="button"
-      accessibilityLabel={`${habit.name}, ${count} of ${habit.targetDailyCount}`}
+      accessibilityLabel={`${habit.name}, ${count} of ${target}`}
       style={({ pressed }) => [pressed && !disabled && styles.pressed, disabled && styles.disabled]}>
       <Animated.View style={[styles.card, borderStyle]}>
         <Animated.View pointerEvents="none" style={[styles.fill, fillStyle]} />
@@ -99,27 +105,24 @@ export function HabitRow({ habit, count, disabled = false, onToggle, onEdit }: H
           </View>
 
           <View style={styles.copy}>
-            <Text style={styles.name} numberOfLines={1}>
+            <Text style={[styles.name, { color: nameColor }]} numberOfLines={1}>
               {habit.name}
             </Text>
-            <Text style={styles.meta} numberOfLines={1}>
+            <Text style={[styles.meta, { color: metaColor }]} numberOfLines={1}>
               {describeOccurrence(habit, t)}
-              {habit.targetDailyCount > 1 ? ` · ${count}/${habit.targetDailyCount}` : ''}
             </Text>
           </View>
 
-          <Animated.View
-            style={[
-              styles.check,
-              count > 0 && { borderColor: colors.accent },
-              complete && { backgroundColor: colors.accent, borderColor: colors.accent },
-              checkStyle,
-            ]}>
-            {complete ? (
-              <Ionicons name="checkmark" size={16} color={colors.onAccent} />
-            ) : count > 0 ? (
-              <Text style={styles.partialCount}>{count}</Text>
-            ) : null}
+          <Animated.View style={checkStyle}>
+            <SegmentedProgress
+              count={count}
+              total={target}
+              size={30}
+              trackColor={count > 0 ? colors.success : colors.border}
+              fillColor={colors.success}
+              checkColor={colors.onSuccess}
+              emptyFillColor={`rgba(${colors.successRgb}, 0.12)`}
+            />
           </Animated.View>
         </View>
       </Animated.View>
@@ -139,7 +142,7 @@ function createStyles(colors: ThemeColors) {
     },
     fill: {
       ...StyleSheet.absoluteFill,
-      backgroundColor: colors.accent,
+      backgroundColor: colors.success,
     },
     row: {
       flexDirection: 'row',
@@ -160,7 +163,7 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: Spacing.md,
-      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+      backgroundColor: 'rgba(255, 255, 255, 0.92)',
     },
     copy: {
       flexGrow: 1,
@@ -168,29 +171,13 @@ function createStyles(colors: ThemeColors) {
       marginRight: Spacing.md,
     },
     name: {
-      color: colors.text,
       fontSize: 16,
       fontWeight: '600',
       marginBottom: 2,
     },
     meta: {
-      color: 'rgba(230, 237, 243, 0.88)',
       fontSize: 12,
-    },
-    check: {
-      width: 28,
-      height: 28,
-      borderRadius: Radii.full,
-      borderWidth: 1.5,
-      borderColor: colors.border,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: 'transparent',
-    },
-    partialCount: {
-      fontSize: 12,
-      fontWeight: '700',
-      color: colors.accent,
+      fontWeight: '500',
     },
   });
 }

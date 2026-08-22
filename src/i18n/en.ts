@@ -11,7 +11,7 @@ export const en = {
   'home.emptyScheduledTitle': 'Nothing scheduled',
   'home.emptyTitle': 'No habits yet',
   'home.emptyScheduledBody': 'No habits are set to occur on this day.',
-  'home.emptyBody': 'Add a habit and choose daily, weekly, or monthly occurrence.',
+  'home.emptyBody': 'Add a habit and choose daily, weekly, or monthly repetitions.',
   'home.hint': 'Tap a card to check off. Long-press to edit.',
 
   // Heatmap
@@ -30,7 +30,7 @@ export const en = {
   'form.name': 'Name',
   'form.namePlaceholder': 'Medicine, vitamins, teeth...',
   'form.category': 'Category',
-  'form.occurrence': 'Occurrence',
+  'form.occurrence': 'Repetitions',
   'form.weekdays': 'Weekdays',
   'form.monthDates': 'Dates of month',
   'form.color': 'Color',

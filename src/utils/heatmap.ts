@@ -7,7 +7,7 @@ export const HEATMAP_FUTURE_WEEKS = 26;
 export const HEATMAP_WEEKS = HEATMAP_PAST_WEEKS + 1 + HEATMAP_FUTURE_WEEKS;
 export const DAYS_IN_WEEK = 7;
 export const EMPTY_CELL_COLOR = '#21262d';
-export const DEFAULT_HEATMAP_COLOR = '#4ade80';
+export const DEFAULT_HEATMAP_COLOR = '#3d9b6a';
 
 export function logKey(habitId: string, date: string): string {
   return `${habitId}:${date}`;

@@ -74,7 +74,7 @@ function createStyles(colors: ThemeColors) {
       height: CIRCLE,
       borderRadius: CIRCLE / 2,
       borderWidth: 1.5,
-      borderColor: colors.accent,
+      borderColor: colors.success,
       alignItems: 'center',
       justifyContent: 'center',
       overflow: 'hidden',
@@ -83,7 +83,7 @@ function createStyles(colors: ThemeColors) {
       width: CIRCLE,
       height: CIRCLE,
       borderRadius: CIRCLE / 2,
-      backgroundColor: colors.accent,
+      backgroundColor: colors.success,
     },
     empty: {
       color: colors.textMuted,

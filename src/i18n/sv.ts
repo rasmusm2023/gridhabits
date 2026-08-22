@@ -13,7 +13,7 @@ export const sv: Translations = {
   'home.emptyScheduledTitle': 'Inget schemalagt',
   'home.emptyTitle': 'Inga vanor ännu',
   'home.emptyScheduledBody': 'Inga vanor är inställda att inträffa denna dag.',
-  'home.emptyBody': 'Lägg till en vana och välj daglig, veckovis eller månadsvis förekomst.',
+  'home.emptyBody': 'Lägg till en vana och välj dagliga, veckovisa eller månadsvisa repetitioner.',
   'home.hint': 'Tryck på ett kort för att checka av. Håll inne för att redigera.',
 
   // Heatmap
@@ -32,7 +32,7 @@ export const sv: Translations = {
   'form.name': 'Namn',
   'form.namePlaceholder': 'Medicin, vitaminer, tänder...',
   'form.category': 'Kategori',
-  'form.occurrence': 'Förekomst',
+  'form.occurrence': 'Repetitioner',
   'form.weekdays': 'Veckodagar',
   'form.monthDates': 'Datum i månaden',
   'form.color': 'Färg',

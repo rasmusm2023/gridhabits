@@ -115,7 +115,7 @@ export default function HomeScreen() {
               onPress={openCreate}
               style={styles.addButton}
               accessibilityLabel={t('home.addHabit')}>
-              <Ionicons name="add" size={22} color={colors.onAccent} />
+              <Ionicons name="add" size={28} color={colors.onAccent} />
             </Pressable>
           </View>
           <View style={styles.sectionMeta}>
@@ -236,9 +236,9 @@ function createStyles(colors: ThemeColors) {
       marginTop: 2,
     },
     addButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
+      width: 48,
+      height: 48,
+      borderRadius: 24,
       backgroundColor: colors.accent,
       alignItems: 'center',
       justifyContent: 'center',

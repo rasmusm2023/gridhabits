@@ -119,7 +119,7 @@ export function HabitHeatmap({
   const { localeTag, t } = useLocale();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const heatAccent = accentColor ?? colors.accent;
+  const heatAccent = accentColor ?? colors.success;
   const currentYear = new Date().getFullYear();
   const dayLabels = useMemo(() => WEEKDAY_OPTIONS.map((option) => t(option.labelKey)), [t]);
   const availableYears = useMemo(
