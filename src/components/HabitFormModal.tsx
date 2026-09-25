@@ -24,17 +24,23 @@ import {
   Habit,
   HabitDraft,
   HabitOccurrence,
+  HabitSection,
   toFilledIconName,
 } from '@/types';
 import {
+  ALL_MONTHS,
   OCCURRENCE_OPTIONS,
+  SEASON_PRESETS,
   WEEKDAY_OPTIONS,
   defaultOccurrenceFields,
+  isYearRound,
 } from '@/utils/occurrence';
 
 type HabitFormModalProps = {
   visible: boolean;
   habit?: Habit | null;
+  sections: HabitSection[];
+  defaultSectionId?: string | null;
   selectedDate: string;
   onClose: () => void;
   onSave: (draft: HabitDraft) => void;
@@ -44,12 +50,14 @@ type HabitFormModalProps = {
 export function HabitFormModal({
   visible,
   habit,
+  sections,
+  defaultSectionId = null,
   selectedDate,
   onClose,
   onSave,
   onDelete,
 }: HabitFormModalProps) {
-  const { t } = useLocale();
+  const { localeTag, t } = useLocale();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [name, setName] = useState('');
@@ -60,7 +68,16 @@ export function HabitFormModal({
   const [occurrence, setOccurrence] = useState<HabitOccurrence>('daily');
   const [weekdays, setWeekdays] = useState<number[]>([1]);
   const [monthDays, setMonthDays] = useState<number[]>([1]);
+  const [activeMonths, setActiveMonths] = useState<number[]>([...ALL_MONTHS]);
+  const [sectionId, setSectionId] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const monthLabels = useMemo(
+    () =>
+      ALL_MONTHS.map((month) =>
+        new Intl.DateTimeFormat(localeTag, { month: 'short' }).format(new Date(2024, month - 1, 1)),
+      ),
+    [localeTag],
+  );
 
   useEffect(() => {
     if (!visible) return;
@@ -72,6 +89,8 @@ export function HabitFormModal({
     setOccurrence(habit?.occurrence ?? 'daily');
     setWeekdays(habit?.weekdays?.length ? habit.weekdays : [1]);
     setMonthDays(habit?.monthDays?.length ? habit.monthDays : [1]);
+    setActiveMonths(habit?.activeMonths?.length ? habit.activeMonths : [...ALL_MONTHS]);
+    setSectionId(habit?.sectionId ?? defaultSectionId);
     setDeleteOpen(false);
   }, [habit, visible]);
 
@@ -89,6 +108,27 @@ export function HabitFormModal({
     setWeekdays((current) =>
       current.includes(day) ? current.filter((item) => item !== day) : [...current, day].sort(),
     );
+  }
+
+  function applySeason(months: readonly number[]) {
+    setActiveMonths((current) => {
+      if (isYearRound(current)) return [...months];
+      const hasAll = months.every((month) => current.includes(month));
+      if (hasAll) {
+        const next = current.filter((month) => !months.includes(month));
+        return next.length > 0 ? next : [...months];
+      }
+      return [...new Set([...current, ...months])].sort((a, b) => a - b);
+    });
+  }
+
+  function toggleActiveMonth(month: number) {
+    setActiveMonths((current) => {
+      const next = current.includes(month)
+        ? current.filter((item) => item !== month)
+        : [...current, month].sort((a, b) => a - b);
+      return next;
+    });
   }
 
   function toggleMonthDay(day: number) {
@@ -114,6 +154,11 @@ export function HabitFormModal({
       return;
     }
 
+    if (activeMonths.length === 0) {
+      Alert.alert(t('form.pickMonthsTitle'), t('form.pickMonthsBody'));
+      return;
+    }
+
     const occurrenceFields = defaultOccurrenceFields(occurrence);
     onSave({
       name: trimmed,
@@ -127,6 +172,9 @@ export function HabitFormModal({
       monthDays: occurrence === 'monthly' ? monthDays : occurrenceFields.monthDays,
       endedAt: habit?.endedAt ?? null,
       skippedDates: habit?.skippedDates ?? [],
+      activeMonths: [...activeMonths].sort((a, b) => a - b),
+      sectionId,
+      sortOrder: habit?.sortOrder ?? 0,
     });
     onClose();
   }
@@ -239,6 +287,75 @@ export function HabitFormModal({
                         style={[styles.monthDay, selected && styles.chipActive]}>
                         <Text style={[styles.chipText, selected && styles.chipTextActive]}>
                           {day}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </>
+            ) : null}
+
+            <Text style={styles.label}>{t('form.months')}</Text>
+            <View style={styles.chipRow}>
+              <Pressable
+                onPress={() => setActiveMonths([...ALL_MONTHS])}
+                style={[styles.chip, isYearRound(activeMonths) && styles.chipActive]}>
+                <Text style={[styles.chipText, isYearRound(activeMonths) && styles.chipTextActive]}>
+                  {t('form.monthsAll')}
+                </Text>
+              </Pressable>
+              {SEASON_PRESETS.map((season) => {
+                const selected =
+                  !isYearRound(activeMonths) &&
+                  season.months.every((month) => activeMonths.includes(month));
+                return (
+                  <Pressable
+                    key={season.id}
+                    onPress={() => applySeason(season.months)}
+                    style={[styles.chip, selected && styles.chipActive]}>
+                    <Text style={[styles.chipText, selected && styles.chipTextActive]}>
+                      {t(season.labelKey)}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <View style={styles.chipRow}>
+              {ALL_MONTHS.map((month) => {
+                const selected = activeMonths.includes(month);
+                return (
+                  <Pressable
+                    key={month}
+                    onPress={() => toggleActiveMonth(month)}
+                    style={[styles.chip, selected && styles.chipActive]}>
+                    <Text style={[styles.chipText, selected && styles.chipTextActive]}>
+                      {monthLabels[month - 1]}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {sections.length > 0 ? (
+              <>
+                <Text style={styles.label}>{t('form.routine')}</Text>
+                <View style={styles.chipRow}>
+                  <Pressable
+                    onPress={() => setSectionId(null)}
+                    style={[styles.chip, sectionId === null && styles.chipActive]}>
+                    <Text style={[styles.chipText, sectionId === null && styles.chipTextActive]}>
+                      {t('form.noRoutine')}
+                    </Text>
+                  </Pressable>
+                  {sections.map((section) => {
+                    const selected = sectionId === section.id;
+                    return (
+                      <Pressable
+                        key={section.id}
+                        onPress={() => setSectionId(section.id)}
+                        style={[styles.chip, selected && styles.chipActive]}>
+                        <Text style={[styles.chipText, selected && styles.chipTextActive]}>
+                          {section.name}
                         </Text>
                       </Pressable>
                     );

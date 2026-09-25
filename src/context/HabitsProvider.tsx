@@ -10,14 +10,16 @@ import {
 
 import { useAuth } from '@/context/AuthProvider';
 import { supabase } from '@/lib/supabase';
-import { Habit, HabitDraft, HabitLog } from '@/types';
+import { Habit, HabitDraft, HabitLog, HabitSection } from '@/types';
 import {
   deleteHabitLogsFromDate,
   deleteHabitRemote,
+  deleteSectionRemote,
   fetchUserHabits,
   seedDefaultHabits,
   upsertHabit,
   upsertHabitLog,
+  upsertSection,
 } from '@/storage/supabaseHabits';
 import { indexLogs, logKey } from '@/utils/heatmap';
 import { createId } from '@/utils/ids';
@@ -27,11 +29,16 @@ export type HabitDeleteMode = 'once' | 'future' | 'entire';
 
 type HabitsContextValue = {
   habits: Habit[];
+  sections: HabitSection[];
   logs: HabitLog[];
   isReady: boolean;
   addHabit: (draft: HabitDraft) => Promise<void>;
   updateHabit: (id: string, patch: Partial<Omit<Habit, 'id' | 'createdAt'>>) => Promise<void>;
   deleteHabit: (id: string, mode: HabitDeleteMode, date: string) => Promise<void>;
+  addSection: (name: string) => Promise<void>;
+  renameSection: (id: string, name: string) => Promise<void>;
+  deleteSection: (id: string) => Promise<void>;
+  saveOutline: (sections: HabitSection[], habits: Habit[]) => Promise<void>;
   incrementHabit: (habitId: string, date: string) => Promise<void>;
   getCount: (habitId: string, date: string) => number;
 };
@@ -41,6 +48,7 @@ const HabitsContext = createContext<HabitsContextValue | null>(null);
 export function HabitsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [habits, setHabits] = useState<Habit[]>([]);
+  const [sections, setSections] = useState<HabitSection[]>([]);
   const [logs, setLogs] = useState<HabitLog[]>([]);
   const [isReady, setIsReady] = useState(false);
 
@@ -50,6 +58,7 @@ export function HabitsProvider({ children }: { children: ReactNode }) {
     async function load() {
       if (!user) {
         setHabits([]);
+        setSections([]);
         setLogs([]);
         setIsReady(true);
         return;
@@ -60,7 +69,7 @@ export function HabitsProvider({ children }: { children: ReactNode }) {
         let state = await fetchUserHabits(user.id);
         if (state.habits.length === 0) {
           const seeded = await seedDefaultHabits(user.id);
-          state = { habits: seeded, logs: [], inactiveIds: [] };
+          state = { habits: seeded, logs: [], sections: [], inactiveIds: [] };
         } else if (state.inactiveIds.length > 0) {
           const inactive = new Set(state.inactiveIds);
           await Promise.all(
@@ -71,6 +80,7 @@ export function HabitsProvider({ children }: { children: ReactNode }) {
         }
         if (cancelled) return;
         setHabits(state.habits);
+        setSections(state.sections);
         setLogs(state.logs);
       } catch (error) {
         const code =
@@ -91,6 +101,7 @@ export function HabitsProvider({ children }: { children: ReactNode }) {
               const state = await fetchUserHabits(user.id);
               if (cancelled) return;
               setHabits(state.habits);
+              setSections(state.sections);
               setLogs(state.logs);
               return;
             }
@@ -102,6 +113,7 @@ export function HabitsProvider({ children }: { children: ReactNode }) {
         console.warn('Failed to load habits from Supabase', error);
         if (!cancelled) {
           setHabits([]);
+          setSections([]);
           setLogs([]);
         }
       } finally {
@@ -118,6 +130,10 @@ export function HabitsProvider({ children }: { children: ReactNode }) {
   const addHabit = useCallback(
     async (draft: HabitDraft) => {
       if (!user) return;
+      const sectionId = draft.sectionId ?? null;
+      const siblings = habits.filter((item) => item.sectionId === sectionId);
+      const sortOrder =
+        siblings.length === 0 ? 0 : Math.max(...siblings.map((item) => item.sortOrder)) + 1;
       const habit = normalizeHabitOccurrence({
         ...draft,
         id: createId(),
@@ -126,6 +142,8 @@ export function HabitsProvider({ children }: { children: ReactNode }) {
         targetDailyCount: Math.max(1, Math.round(draft.targetDailyCount)),
         endedAt: draft.endedAt ?? null,
         skippedDates: draft.skippedDates ?? [],
+        sectionId,
+        sortOrder,
       });
       setHabits((current) => [...current, habit]);
       try {
@@ -135,7 +153,7 @@ export function HabitsProvider({ children }: { children: ReactNode }) {
         setHabits((current) => current.filter((item) => item.id !== habit.id));
       }
     },
-    [user],
+    [user, habits],
   );
 
   const updateHabit = useCallback(
@@ -148,6 +166,11 @@ export function HabitsProvider({ children }: { children: ReactNode }) {
         current.map((habit) => {
           if (habit.id !== id) return habit;
           previous = habit;
+          const sectionChanged =
+            patch.sectionId !== undefined && patch.sectionId !== habit.sectionId;
+          const siblings = sectionChanged
+            ? current.filter((item) => item.id !== id && item.sectionId === (patch.sectionId ?? null))
+            : [];
           nextHabit = normalizeHabitOccurrence({
             ...habit,
             ...patch,
@@ -156,6 +179,11 @@ export function HabitsProvider({ children }: { children: ReactNode }) {
               1,
               Math.round(patch.targetDailyCount ?? habit.targetDailyCount),
             ),
+            sortOrder: sectionChanged
+              ? siblings.length === 0
+                ? 0
+                : Math.max(...siblings.map((item) => item.sortOrder)) + 1
+              : (patch.sortOrder ?? habit.sortOrder),
           });
           return nextHabit;
         }),
@@ -225,6 +253,107 @@ export function HabitsProvider({ children }: { children: ReactNode }) {
     [user, habits, logs],
   );
 
+  const addSection = useCallback(
+    async (name: string) => {
+      if (!user) return;
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      const section: HabitSection = {
+        id: createId(),
+        name: trimmed,
+        sortOrder: sections.length === 0 ? 0 : Math.max(...sections.map((item) => item.sortOrder)) + 1,
+      };
+      setSections((current) => [...current, section]);
+      try {
+        await upsertSection(user.id, section);
+      } catch (error) {
+        console.warn('Failed to save routine', error);
+        setSections((current) => current.filter((item) => item.id !== section.id));
+      }
+    },
+    [user, sections],
+  );
+
+  const renameSection = useCallback(
+    async (id: string, name: string) => {
+      if (!user) return;
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      let previous: HabitSection | undefined;
+      setSections((current) =>
+        current.map((section) => {
+          if (section.id !== id) return section;
+          previous = section;
+          return { ...section, name: trimmed };
+        }),
+      );
+      if (!previous) return;
+      try {
+        await upsertSection(user.id, { ...previous, name: trimmed });
+      } catch (error) {
+        console.warn('Failed to rename routine', error);
+        setSections((current) => current.map((section) => (section.id === id ? previous! : section)));
+      }
+    },
+    [user],
+  );
+
+  const deleteSection = useCallback(
+    async (id: string) => {
+      if (!user) return;
+      const previousSections = sections;
+      const previousHabits = habits;
+      const nextSections = sections.filter((section) => section.id !== id);
+      const nextHabits = habits.map((habit) =>
+        habit.sectionId === id ? { ...habit, sectionId: null } : habit,
+      );
+      setSections(nextSections);
+      setHabits(nextHabits);
+      try {
+        await Promise.all(
+          nextHabits
+            .filter((habit) => habit.sectionId === null && previousHabits.find((item) => item.id === habit.id)?.sectionId === id)
+            .map((habit) => upsertHabit(user.id, habit)),
+        );
+        await deleteSectionRemote(user.id, id);
+      } catch (error) {
+        console.warn('Failed to delete routine', error);
+        setSections(previousSections);
+        setHabits(previousHabits);
+      }
+    },
+    [user, sections, habits],
+  );
+
+  const saveOutline = useCallback(
+    async (nextSections: HabitSection[], nextHabits: Habit[]) => {
+      if (!user) return;
+      const previousSections = sections;
+      const previousHabits = habits;
+      setSections(nextSections);
+      setHabits(nextHabits);
+      try {
+        const changedHabits = nextHabits.filter((habit) => {
+          const previous = previousHabits.find((item) => item.id === habit.id);
+          return (
+            !previous ||
+            previous.sectionId !== habit.sectionId ||
+            previous.sortOrder !== habit.sortOrder
+          );
+        });
+        await Promise.all([
+          ...nextSections.map((section) => upsertSection(user.id, section)),
+          ...changedHabits.map((habit) => upsertHabit(user.id, habit)),
+        ]);
+      } catch (error) {
+        console.warn('Failed to save habit order', error);
+        setSections(previousSections);
+        setHabits(previousHabits);
+      }
+    },
+    [user, sections, habits],
+  );
+
   const incrementHabit = useCallback(
     async (habitId: string, date: string) => {
       if (!user) return;
@@ -268,15 +397,34 @@ export function HabitsProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       habits,
+      sections,
       logs,
       isReady,
       addHabit,
       updateHabit,
       deleteHabit,
+      addSection,
+      renameSection,
+      deleteSection,
+      saveOutline,
       incrementHabit,
       getCount,
     }),
-    [habits, logs, isReady, addHabit, updateHabit, deleteHabit, incrementHabit, getCount],
+    [
+      habits,
+      sections,
+      logs,
+      isReady,
+      addHabit,
+      updateHabit,
+      deleteHabit,
+      addSection,
+      renameSection,
+      deleteSection,
+      saveOutline,
+      incrementHabit,
+      getCount,
+    ],
   );
 
   return <HabitsContext.Provider value={value}>{children}</HabitsContext.Provider>;

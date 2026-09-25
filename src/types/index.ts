@@ -19,6 +19,18 @@ export interface Habit {
   endedAt: string | null;
   /** Specific YYYY-MM-DD dates skipped once (habit continues otherwise). */
   skippedDates: string[];
+  /** Calendar months 1–12 when the habit is expected. All twelve means year-round. */
+  activeMonths: number[];
+  /** Routine this habit belongs to. Null keeps it outside any section. */
+  sectionId: string | null;
+  /** Order within its routine, or among ungrouped habits. */
+  sortOrder: number;
+}
+
+export interface HabitSection {
+  id: string;
+  name: string;
+  sortOrder: number;
 }
 
 export interface HabitLog {

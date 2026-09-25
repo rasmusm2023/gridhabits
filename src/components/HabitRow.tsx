@@ -17,7 +17,7 @@ import { useLocale } from '@/context/LocaleProvider';
 import { useTheme } from '@/context/ThemeProvider';
 import { Habit, toFilledIconName } from '@/types';
 import { getHabitProgress } from '@/utils/heatmap';
-import { describeOccurrence } from '@/utils/occurrence';
+import { describeActiveMonths, describeOccurrence } from '@/utils/occurrence';
 
 type HabitRowProps = {
   habit: Habit;
@@ -28,7 +28,7 @@ type HabitRowProps = {
 };
 
 export function HabitRow({ habit, count, disabled = false, onToggle, onEdit }: HabitRowProps) {
-  const { t } = useLocale();
+  const { localeTag, t } = useLocale();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const progress = getHabitProgress(habit, count);
@@ -95,7 +95,11 @@ export function HabitRow({ habit, count, disabled = false, onToggle, onEdit }: H
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={`${habit.name}, ${count} of ${target}`}
-      style={({ pressed }) => [pressed && !disabled && styles.pressed, disabled && styles.disabled]}>
+      style={({ pressed }) => [
+        styles.flex,
+        pressed && !disabled && styles.pressed,
+        disabled && styles.disabled,
+      ]}>
       <Animated.View style={[styles.card, borderStyle]}>
         <Animated.View pointerEvents="none" style={[styles.fill, fillStyle]} />
         <View style={styles.row}>
@@ -112,7 +116,19 @@ export function HabitRow({ habit, count, disabled = false, onToggle, onEdit }: H
               {habit.name}
             </Text>
             <Text style={[styles.meta, { color: metaColor }]} numberOfLines={1}>
-              {describeOccurrence(habit, t)}
+              {[
+                describeOccurrence(habit, t),
+                describeActiveMonths(
+                  habit,
+                  (month) =>
+                    new Intl.DateTimeFormat(localeTag, { month: 'short' }).format(
+                      new Date(2024, month - 1, 1),
+                    ),
+                  t,
+                ),
+              ]
+                .filter(Boolean)
+                .join(' · ')}
             </Text>
           </View>
 
@@ -135,6 +151,9 @@ export function HabitRow({ habit, count, disabled = false, onToggle, onEdit }: H
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
+    flex: {
+      flex: 1,
+    },
     card: {
       borderWidth: 1,
       borderRadius: Radii.md,
